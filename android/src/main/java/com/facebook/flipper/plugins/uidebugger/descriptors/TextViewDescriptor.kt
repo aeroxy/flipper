@@ -10,20 +10,14 @@ package com.facebook.flipper.plugins.uidebugger.descriptors
 import android.widget.TextView
 import com.facebook.flipper.plugins.uidebugger.common.InspectableObject
 
-class TextViewDescriptor : AbstractChainedDescriptor<TextView>() {
+object TextViewDescriptor : ChainedDescriptor<TextView>() {
 
-  override fun onGetId(textView: TextView): String {
-    return Integer.toString(System.identityHashCode(textView))
+  override fun onGetName(node: TextView): String {
+    return node.javaClass.simpleName
   }
-
-  override fun onGetName(textView: TextView): String {
-    return textView.javaClass.simpleName
-  }
-
-  override fun onGetChildren(textView: TextView, children: MutableList<Any>) {}
 
   override fun onGetData(
-      textView: TextView,
-      attributeSections: MutableMap<String, InspectableObject>
+      node: TextView,
+      attributeSections: MutableMap<SectionName, InspectableObject>
   ) {}
 }

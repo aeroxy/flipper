@@ -7,14 +7,13 @@
 
 package com.facebook.flipper.plugins.uidebugger.core
 
+import android.annotation.SuppressLint
 import android.os.Build
 import android.view.View
 import android.view.WindowManager
 import java.lang.reflect.Field
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Modifier
-import java.util.ArrayList
-import java.util.List
 
 /**
  * Provides access to all root views in an application.
@@ -35,32 +34,32 @@ class RootViewResolver {
   private var viewsField: Field? = null
   private var paramsField: Field? = null
 
-  class RootView(val view: View, val param: WindowManager.LayoutParams)
+  class RootView(val view: View, val param: WindowManager.LayoutParams?)
   interface Listener {
     fun onRootViewAdded(rootView: View)
     fun onRootViewRemoved(rootView: View)
-    fun onRootViewsChanged(rootView: List<View>)
+    fun onRootViewsChanged(rootViews: List<View>)
   }
 
-  class ObservableArrayList() : ArrayList<View>() {
+  class ObservableArrayList : ArrayList<View>() {
     private var listener: Listener? = null
     fun setListener(listener: Listener?) {
       this.listener = listener
     }
 
-    override fun add(value: View): Boolean {
-      val ret = super.add(value)
+    override fun add(element: View): Boolean {
+      val ret = super.add(element)
       listener?.let { l ->
-        l.onRootViewAdded(value)
+        l.onRootViewAdded(element)
         l.onRootViewsChanged(this as List<View>)
       }
       return ret
     }
 
-    override fun remove(value: View): Boolean {
-      val ret = super.remove(value)
+    override fun remove(element: View): Boolean {
+      val ret = super.remove(element)
       listener?.let { l ->
-        l.onRootViewRemoved(value)
+        l.onRootViewRemoved(element)
         l.onRootViewsChanged(this as List<View>)
       }
 
@@ -88,11 +87,12 @@ class RootViewResolver {
     try {
       viewsField?.let { vf ->
         // Forgive me father for I have sinned...
+        @SuppressLint("DiscouragedPrivateApi")
         val modifiers = Field::class.java.getDeclaredField("accessFlags")
         modifiers.isAccessible = true
         modifiers.setInt(vf, vf.modifiers and Modifier.FINAL.inv())
 
-        val views = vf[windowManagerObj] as List<View>
+        @Suppress("unchecked_cast") val views = vf[windowManagerObj] as List<View>
 
         val observableViews = ObservableArrayList()
         observableViews.setListener(listener)
@@ -122,25 +122,30 @@ class RootViewResolver {
     if (null == paramsField) {
       return null
     }
-    var views: List<View>? = null
-    var params: List<WindowManager.LayoutParams>? = null
+    var maybeViews: List<View>? = null
+    var maybeParams: List<WindowManager.LayoutParams>? = null
     try {
       viewsField?.let { field ->
-        if (Build.VERSION.SDK_INT < 19) {
-          val arr = field[windowManagerObj] as Array<View>
-          views = arr.toList() as List<View>
-        } else {
-          views = field[windowManagerObj] as List<View>
-        }
+        maybeViews =
+            if (Build.VERSION.SDK_INT < 19) {
+              @Suppress("unchecked_cast") val arr = field[windowManagerObj] as Array<View>
+              arr.toList()
+            } else {
+              @Suppress("unchecked_cast")
+              field[windowManagerObj] as List<View>
+            }
       }
 
       paramsField?.let { field ->
-        if (Build.VERSION.SDK_INT < 19) {
-          val arr = field[windowManagerObj] as Array<WindowManager.LayoutParams>
-          params = arr.toList() as List<WindowManager.LayoutParams>
-        } else {
-          params = field[windowManagerObj] as List<WindowManager.LayoutParams>
-        }
+        maybeParams =
+            if (Build.VERSION.SDK_INT < 19) {
+              @Suppress("unchecked_cast")
+              val arr = field[windowManagerObj] as Array<WindowManager.LayoutParams>
+              arr.toList()
+            } else {
+              @Suppress("unchecked_cast")
+              field[windowManagerObj] as List<WindowManager.LayoutParams>
+            }
       }
     } catch (re: RuntimeException) {
       return null
@@ -148,16 +153,20 @@ class RootViewResolver {
       return null
     }
 
-    val roots: ArrayList<RootView> = ArrayList()
-    views?.let { views ->
-      params?.let { params ->
-        for (i in views.indices) {
-          roots.add(RootView(views[i], params[i]))
+    val roots = mutableListOf<RootView>()
+    maybeViews?.let { views ->
+      maybeParams?.let { params ->
+        if (views.size == params.size) {
+          for (i in views.indices) {
+            val view = views[i]
+            val param = params[i]
+            roots.add(RootView(view, param))
+          }
         }
       }
     }
 
-    return roots as List<RootView>
+    return roots
   }
 
   private fun initialize() {
@@ -170,16 +179,15 @@ class RootViewResolver {
       val getMethod = clazz.getMethod(instanceMethod)
       windowManagerObj = getMethod.invoke(null)
       viewsField = clazz.getDeclaredField(VIEWS_FIELD)
-      viewsField?.let { vf -> vf.setAccessible(true) }
+      viewsField?.let { vf -> vf.isAccessible = true }
       paramsField = clazz.getDeclaredField(WINDOW_PARAMS_FIELD)
-      paramsField?.let { pf -> pf.setAccessible(true) }
+      paramsField?.let { pf -> pf.isAccessible = true }
     } catch (ite: InvocationTargetException) {} catch (cnfe: ClassNotFoundException) {} catch (
         nsfe: NoSuchFieldException) {} catch (nsme: NoSuchMethodException) {} catch (
         re: RuntimeException) {} catch (iae: IllegalAccessException) {}
   }
 
   companion object {
-    private val TAG = RootViewResolver::class.java.simpleName
     private const val WINDOW_MANAGER_IMPL_CLAZZ = "android.view.WindowManagerImpl"
     private const val WINDOW_MANAGER_GLOBAL_CLAZZ = "android.view.WindowManagerGlobal"
     private const val VIEWS_FIELD = "mViews"

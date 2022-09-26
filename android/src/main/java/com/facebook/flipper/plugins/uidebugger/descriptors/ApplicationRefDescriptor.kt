@@ -8,49 +8,44 @@
 package com.facebook.flipper.plugins.uidebugger.descriptors
 
 import android.app.Activity
-import com.facebook.flipper.plugins.uidebugger.common.InspectableObject
+import android.content.res.Resources
+import android.view.View
 import com.facebook.flipper.plugins.uidebugger.core.ApplicationRef
-import com.facebook.flipper.plugins.uidebugger.core.RootViewResolver
+import com.facebook.flipper.plugins.uidebugger.model.Bounds
 
-class ApplicationRefDescriptor : AbstractChainedDescriptor<ApplicationRef>() {
-  val rootResolver = RootViewResolver()
+object ApplicationRefDescriptor : ChainedDescriptor<ApplicationRef>() {
 
-  override fun onInit() {}
-
-  override fun onGetId(applicationRef: ApplicationRef): String {
-    return applicationRef.application.packageName
+  override fun onGetActiveChild(node: ApplicationRef): Any? {
+    return if (node.activitiesStack.isNotEmpty()) node.activitiesStack.last() else null
   }
 
-  override fun onGetName(applicationRef: ApplicationRef): String {
-    val applicationInfo = applicationRef.application.getApplicationInfo()
+  override fun onGetBounds(node: ApplicationRef): Bounds {
+    val displayMetrics = Resources.getSystem().getDisplayMetrics()
+    return Bounds(0, 0, displayMetrics.widthPixels, displayMetrics.heightPixels)
+  }
+
+  override fun onGetName(node: ApplicationRef): String {
+    val applicationInfo = node.application.applicationInfo
     val stringId = applicationInfo.labelRes
     return if (stringId == 0) applicationInfo.nonLocalizedLabel.toString()
-    else applicationRef.application.getString(stringId)
+    else node.application.getString(stringId)
   }
 
-  override fun onGetChildren(applicationRef: ApplicationRef, children: MutableList<Any>) {
-    val activeRoots = rootResolver.listActiveRootViews()
+  override fun onGetChildren(node: ApplicationRef, children: MutableList<Any>) {
+    val activeRoots = node.rootViews
 
-    activeRoots?.let { roots ->
-      for (root: RootViewResolver.RootView in roots) {
-        var added = false
-        for (activity: Activity in applicationRef.activitiesStack) {
-          if (activity.window.decorView == root.view) {
-            children.add(activity)
-            added = true
+    val added = mutableSetOf<View>()
+    for (activity: Activity in node.activitiesStack) {
+      children.add(activity)
+      added.add(activity.window.decorView)
+    }
 
-            break
-          }
-        }
-        if (!added) {
-          children.add(root.view)
-        }
+    // Picks up root views not tied to an activity (dialogs)
+    for (root in activeRoots) {
+      if (!added.contains(root)) {
+        children.add(root)
+        added.add(root)
       }
     }
   }
-
-  override fun onGetData(
-      applicationRef: ApplicationRef,
-      attributeSections: MutableMap<String, InspectableObject>
-  ) {}
 }

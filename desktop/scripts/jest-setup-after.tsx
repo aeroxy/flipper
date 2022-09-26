@@ -137,6 +137,7 @@ function createStubRenderHost(): RenderHost {
       launcherEnabled: false,
       launcherMsg: null,
       screenCapturePath: `/dev/null`,
+      suppressPluginUpdateNotifications: false,
     },
     settings: {
       androidHome: `/dev/null`,
@@ -170,6 +171,9 @@ function createStubRenderHost(): RenderHost {
     async exportFile() {
       return undefined;
     },
+    async exportFileBinary() {
+      return undefined;
+    },
     hasFocus() {
       return true;
     },
@@ -181,9 +185,6 @@ function createStubRenderHost(): RenderHost {
     restartFlipper() {},
     openLink() {},
     serverConfig: stubConfig,
-    loadDefaultPlugins() {
-      return {};
-    },
     GK(gk: string) {
       return stubConfig.gatekeepers[gk] ?? false;
     },

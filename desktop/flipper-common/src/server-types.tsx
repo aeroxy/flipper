@@ -9,7 +9,6 @@
 
 import {FlipperDoctor} from './doctor';
 import {
-  BundledPluginDetails,
   DeviceSpec,
   DeviceType,
   DownloadablePluginDetails,
@@ -254,7 +253,6 @@ export type FlipperServerCommands = {
   'keychain-unset': (service: string) => Promise<void>;
   'plugins-load-dynamic-plugins': () => Promise<InstalledPluginDetails[]>;
   'plugins-load-marketplace-plugins': () => Promise<MarketplacePluginDetails[]>;
-  'plugins-get-bundled-plugins': () => Promise<BundledPluginDetails[]>;
   'plugins-get-installed-plugins': () => Promise<InstalledPluginDetails[]>;
   'plugins-get-updatable-plugins': (
     query: string | undefined,
@@ -472,6 +470,9 @@ export type FlipperServerConfig = {
   type?: FlipperServerType;
 };
 
+export interface FlipperServerExecOptions {
+  timeout: number;
+}
 export interface FlipperServer {
   connect(): Promise<void>;
   on<Event extends keyof FlipperServerEvents>(
@@ -482,6 +483,11 @@ export interface FlipperServer {
     event: Event,
     callback: (payload: FlipperServerEvents[Event]) => void,
   ): void;
+  exec<Event extends keyof FlipperServerCommands>(
+    options: FlipperServerExecOptions,
+    event: Event,
+    ...args: Parameters<FlipperServerCommands[Event]>
+  ): ReturnType<FlipperServerCommands[Event]>;
   exec<Event extends keyof FlipperServerCommands>(
     event: Event,
     ...args: Parameters<FlipperServerCommands[Event]>

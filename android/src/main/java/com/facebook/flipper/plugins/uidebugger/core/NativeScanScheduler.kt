@@ -9,9 +9,12 @@ package com.facebook.flipper.plugins.uidebugger.core
 
 import android.os.Looper
 import android.util.Log
+import com.facebook.flipper.plugins.uidebugger.LogTag
 import com.facebook.flipper.plugins.uidebugger.model.NativeScanEvent
 import com.facebook.flipper.plugins.uidebugger.model.Node
 import com.facebook.flipper.plugins.uidebugger.model.PerfStatsEvent
+import com.facebook.flipper.plugins.uidebugger.observers.PartialLayoutTraversal
+import com.facebook.flipper.plugins.uidebugger.observers.TreeObserverFactory
 import com.facebook.flipper.plugins.uidebugger.scheduler.Scheduler
 import kotlinx.serialization.json.Json
 
@@ -22,39 +25,37 @@ data class ScanResult(
     val nodes: List<Node>
 )
 
+/** This is used to stress test the ui debugger, should not be used in production */
 class NativeScanScheduler(val context: Context) : Scheduler.Task<ScanResult> {
-  val traversal = LayoutTraversal(context.descriptorRegister, context.applicationRef)
-  var txId = 0L
-  override fun execute(): ScanResult {
+  /**
+   * when you supply no observers the traversal will never halt and will effectively scan the entire
+   * hierarchy
+   */
+  private val emptyObserverFactory = TreeObserverFactory()
+  private val traversal = PartialLayoutTraversal(context.descriptorRegister, emptyObserverFactory)
+  private var txId = 0L
 
+  override fun execute(): ScanResult {
     val start = System.currentTimeMillis()
-    val nodes = traversal.traverse()
+    val (nodes) = traversal.traverse(context.applicationRef)
     val scanEnd = System.currentTimeMillis()
 
     Log.d(
-        "LAYOUT_SCHEDULER",
-        Thread.currentThread().name +
-            Looper.myLooper() +
-            ", produced: " +
-            {
-              nodes.count()
-            } +
-            " nodes")
+        LogTag,
+        "${Thread.currentThread().name}${Looper.myLooper()} produced: ${nodes.count()} nodes")
 
     return ScanResult(txId++, start, scanEnd, nodes)
   }
 
-  override fun process(result: ScanResult) {
-
+  override fun process(input: ScanResult) {
     val serialized =
-        Json.encodeToString(
-            NativeScanEvent.serializer(), NativeScanEvent(result.txId, result.nodes))
+        Json.encodeToString(NativeScanEvent.serializer(), NativeScanEvent(input.txId, input.nodes))
     val serializationEnd = System.currentTimeMillis()
+
     context.connectionRef.connection?.send(
         NativeScanEvent.name,
         serialized,
     )
-
     val socketEnd = System.currentTimeMillis()
 
     context.connectionRef.connection?.send(
@@ -62,11 +63,13 @@ class NativeScanScheduler(val context: Context) : Scheduler.Task<ScanResult> {
         Json.encodeToString(
             PerfStatsEvent.serializer(),
             PerfStatsEvent(
-                result.txId,
-                result.scanStart,
-                result.scanEnd,
+                input.txId,
+                "FullScan",
+                input.scanStart,
+                input.scanEnd,
+                input.scanEnd,
                 serializationEnd,
                 socketEnd,
-                result.nodes.size)))
+                input.nodes.size)))
   }
 }

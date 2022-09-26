@@ -7,10 +7,19 @@
 
 package com.facebook.flipper.plugins.uidebugger.model
 
+import com.facebook.flipper.plugins.uidebugger.descriptors.Id
+
 @kotlinx.serialization.Serializable
-data class InitEvent(val rootId: String) {
+data class InitEvent(val rootId: Id) {
   companion object {
     const val name = "init"
+  }
+}
+
+@kotlinx.serialization.Serializable
+data class SubtreeUpdateEvent(val txId: Long, val observerType: String, val nodes: List<Node>) {
+  companion object {
+    const val name = "subtreeUpdate"
   }
 }
 
@@ -25,8 +34,10 @@ data class NativeScanEvent(val txId: Long, val nodes: List<Node>) {
 @kotlinx.serialization.Serializable
 data class PerfStatsEvent(
     val txId: Long,
+    val observerType: String,
     val start: Long,
-    val scanComplete: Long,
+    val traversalComplete: Long,
+    val queuingComplete: Long,
     val serializationComplete: Long,
     val socketComplete: Long,
     val nodesCount: Int

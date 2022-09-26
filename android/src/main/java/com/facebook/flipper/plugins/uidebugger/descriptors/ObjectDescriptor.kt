@@ -8,19 +8,20 @@
 package com.facebook.flipper.plugins.uidebugger.descriptors
 
 import com.facebook.flipper.plugins.uidebugger.common.InspectableObject
+import com.facebook.flipper.plugins.uidebugger.model.Bounds
 
-class ObjectDescriptor : Descriptor<Any>() {
-  override fun init() {}
+object ObjectDescriptor : NodeDescriptor<Any> {
 
-  override fun getId(obj: Any): String {
-    return Integer.toString(System.identityHashCode(obj))
+  override fun getActiveChild(node: Any): Any? = null
+
+  override fun getName(node: Any): String {
+    return node.javaClass.simpleName
   }
 
-  override fun getName(obj: Any): String {
-    return obj.javaClass.simpleName
-  }
+  override fun getChildren(node: Any) = listOf<Any>()
 
-  override fun getChildren(node: Any, children: MutableList<Any>) {}
+  override fun getData(node: Any) = mutableMapOf<SectionName, InspectableObject>()
 
-  override fun getData(obj: Any, builder: MutableMap<String, InspectableObject>) {}
+  override fun getBounds(node: Any): Bounds? = null
+  override fun getTags(node: Any): Set<String> = setOf(BaseTags.Unknown)
 }

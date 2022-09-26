@@ -274,7 +274,8 @@ async function waitForLogin(store: Store) {
 }
 
 async function verifyFlipperIsUpToDate(title: string) {
-  if (!isProduction() || isTest()) {
+  const config = getRenderHostInstance().serverConfig.processConfig;
+  if (!isProduction() || isTest() || config.suppressPluginUpdateNotifications) {
     return;
   }
   const currentVersion = getAppVersion();
@@ -367,11 +368,6 @@ async function verifyPluginStatus(
           return [false, status];
         }
         break;
-      case 'bundle_installable': {
-        // For convenience, don't ask user to install bundled plugins, handle it directly
-        await installBundledPlugin(store, pluginId, title);
-        break;
-      }
       case 'marketplace_installable': {
         if (!(await installMarketPlacePlugin(store, pluginId, title))) {
           return [false, status];
@@ -381,30 +377,6 @@ async function verifyPluginStatus(
       default:
         throw new Error('Unhandled state: ' + status);
     }
-  }
-}
-
-async function installBundledPlugin(
-  store: Store,
-  pluginId: string,
-  title: string,
-) {
-  const plugin = store.getState().plugins.bundledPlugins.get(pluginId);
-  if (!plugin || !plugin.isBundled) {
-    throw new Error(`Failed to find bundled plugin '${pluginId}'`);
-  }
-  const loadingDialog = Dialog.loading({
-    title,
-    message: `Loading plugin '${pluginId}'...`,
-  });
-  store.dispatch(loadPlugin({plugin, enable: true, notifyIfFailed: true}));
-  try {
-    await waitFor(
-      store,
-      () => getPluginStatus(store, pluginId)[0] !== 'bundle_installable',
-    );
-  } finally {
-    loadingDialog.close();
   }
 }
 

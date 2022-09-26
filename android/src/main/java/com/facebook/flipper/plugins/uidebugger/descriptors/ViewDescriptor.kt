@@ -7,8 +7,10 @@
 
 package com.facebook.flipper.plugins.uidebugger.descriptors
 
+import android.annotation.SuppressLint
 import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.Drawable
+import android.os.Build
 import android.util.SparseArray
 import android.view.Gravity
 import android.view.View
@@ -19,134 +21,125 @@ import com.facebook.flipper.plugins.uidebugger.common.EnumMapping
 import com.facebook.flipper.plugins.uidebugger.common.Inspectable
 import com.facebook.flipper.plugins.uidebugger.common.InspectableObject
 import com.facebook.flipper.plugins.uidebugger.common.InspectableValue
-import com.facebook.flipper.plugins.uidebugger.stetho.ResourcesUtil
+import com.facebook.flipper.plugins.uidebugger.model.Bounds
+import com.facebook.flipper.plugins.uidebugger.util.ResourcesUtil
 import java.lang.reflect.Field
 
-class ViewDescriptor : AbstractChainedDescriptor<View>() {
+object ViewDescriptor : ChainedDescriptor<View>() {
 
-  override fun onGetId(view: View): String {
-    return Integer.toBinaryString(System.identityHashCode(view))
+  override fun onGetName(node: View): String {
+    return node.javaClass.simpleName
   }
 
-  override fun onGetName(view: View): String {
-    return view.javaClass.simpleName
+  override fun onGetBounds(node: View): Bounds {
+    return Bounds(node.left, node.top, node.width, node.height)
   }
 
-  override fun onGetChildren(view: View, children: MutableList<Any>) {}
+  override fun onGetTags(node: View): Set<String> = setOf(BaseTags.Native, BaseTags.Android)
 
-  override fun onGetData(view: View, attributeSections: MutableMap<String, InspectableObject>) {
+  override fun onGetData(
+      node: View,
+      attributeSections: MutableMap<SectionName, InspectableObject>
+  ) {
     val positionOnScreen = IntArray(2)
-    view.getLocationOnScreen(positionOnScreen)
+    node.getLocationOnScreen(positionOnScreen)
 
     val props = mutableMapOf<String, Inspectable>()
-    props.put("height", InspectableValue.Number(view.height, mutable = true))
-    props.put("width", InspectableValue.Number(view.width, mutable = true))
-    props.put("alpha", InspectableValue.Number(view.alpha, mutable = true))
-    props.put("visibility", VisibilityMapping.toInspectable(view.visibility, mutable = false))
+    props["height"] = InspectableValue.Number(node.height, mutable = true)
+    props["width"] = InspectableValue.Number(node.width, mutable = true)
+    props["alpha"] = InspectableValue.Number(node.alpha, mutable = true)
+    props["visibility"] = VisibilityMapping.toInspectable(node.visibility, mutable = false)
 
-    fromDrawable(view.background)?.let { props.put("background", it) }
+    fromDrawable(node.background)?.let { props["background"] = it }
 
-    view.tag?.let { InspectableValue.fromAny(it, mutable = false) }?.let { props.put("tag", it) }
-    props.put("keyedTags", InspectableObject(getTags(view)))
-    props.put("layoutParams", getLayoutParams(view))
-    props.put(
-        "state",
+    node.tag?.let { InspectableValue.fromAny(it, mutable = false) }?.let { props.put("tag", it) }
+    props["keyedTags"] = InspectableObject(getViewTags(node))
+    props["layoutParams"] = getLayoutParams(node)
+    props["state"] =
         InspectableObject(
             mapOf(
-                "enabled" to InspectableValue.Boolean(view.isEnabled, mutable = false),
-                "activated" to InspectableValue.Boolean(view.isActivated, mutable = false),
-                "focused" to InspectableValue.Boolean(view.isFocused, mutable = false),
-                "selected" to InspectableValue.Boolean(view.isSelected, mutable = false))))
+                "enabled" to InspectableValue.Boolean(node.isEnabled, mutable = false),
+                "activated" to InspectableValue.Boolean(node.isActivated, mutable = false),
+                "focused" to InspectableValue.Boolean(node.isFocused, mutable = false),
+                "selected" to InspectableValue.Boolean(node.isSelected, mutable = false)))
 
-    props.put(
-        "bounds",
+    props["bounds"] =
         InspectableObject(
             mapOf<String, Inspectable>(
-                "left" to InspectableValue.Number(view.left, mutable = true),
-                "right" to InspectableValue.Number(view.right, mutable = true),
-                "top" to InspectableValue.Number(view.top, mutable = true),
-                "bottom" to InspectableValue.Number(view.bottom, mutable = true))))
-    props.put(
-        "padding",
+                "left" to InspectableValue.Number(node.left, mutable = true),
+                "right" to InspectableValue.Number(node.right, mutable = true),
+                "top" to InspectableValue.Number(node.top, mutable = true),
+                "bottom" to InspectableValue.Number(node.bottom, mutable = true)))
+    props["padding"] =
         InspectableObject(
             mapOf<String, Inspectable>(
-                "left" to InspectableValue.Number(view.paddingLeft, mutable = true),
-                "right" to InspectableValue.Number(view.paddingRight, mutable = true),
-                "top" to InspectableValue.Number(view.paddingTop, mutable = true),
-                "bottom" to InspectableValue.Number(view.paddingBottom, mutable = true))))
+                "left" to InspectableValue.Number(node.paddingLeft, mutable = true),
+                "right" to InspectableValue.Number(node.paddingRight, mutable = true),
+                "top" to InspectableValue.Number(node.paddingTop, mutable = true),
+                "bottom" to InspectableValue.Number(node.paddingBottom, mutable = true)))
 
-    props.put(
-        "rotation",
+    props["rotation"] =
         InspectableObject(
             mapOf<String, Inspectable>(
-                "x" to InspectableValue.Number(view.rotationX, mutable = true),
-                "y" to InspectableValue.Number(view.rotationY, mutable = true),
-                "z" to InspectableValue.Number(view.rotation, mutable = true))))
+                "x" to InspectableValue.Number(node.rotationX, mutable = true),
+                "y" to InspectableValue.Number(node.rotationY, mutable = true),
+                "z" to InspectableValue.Number(node.rotation, mutable = true)))
 
-    props.put(
-        "scale",
+    props["scale"] =
         InspectableObject(
             mapOf(
-                "x" to InspectableValue.Number(view.scaleX, mutable = true),
-                "y" to InspectableValue.Number(view.scaleY, mutable = true))))
-    props.put(
-        "pivot",
+                "x" to InspectableValue.Number(node.scaleX, mutable = true),
+                "y" to InspectableValue.Number(node.scaleY, mutable = true)))
+    props["pivot"] =
         InspectableObject(
             mapOf(
-                "x" to InspectableValue.Number(view.pivotX, mutable = true),
-                "y" to InspectableValue.Number(view.pivotY, mutable = true))))
+                "x" to InspectableValue.Number(node.pivotX, mutable = true),
+                "y" to InspectableValue.Number(node.pivotY, mutable = true)))
 
-    props.put(
-        "globalPosition",
+    props["globalPosition"] =
         InspectableObject(
             mapOf(
                 "x" to InspectableValue.Number(positionOnScreen[0], mutable = false),
-                "y" to InspectableValue.Number(positionOnScreen[1], mutable = false))))
+                "y" to InspectableValue.Number(positionOnScreen[1], mutable = false)))
 
-    attributeSections.put("View", InspectableObject(props.toMap()))
+    attributeSections["View"] = InspectableObject(props.toMap())
   }
 
-  fun fromDrawable(d: Drawable?): Inspectable? {
+  private fun fromDrawable(d: Drawable?): Inspectable? {
     return if (d is ColorDrawable) {
       InspectableValue.Color(d.color, mutable = false)
     } else null
   }
 
-  fun getLayoutParams(node: View): InspectableObject {
+  private fun getLayoutParams(node: View): InspectableObject {
     val layoutParams = node.layoutParams
 
     val params = mutableMapOf<String, Inspectable>()
-    params.put("width", LayoutParamsMapping.toInspectable(layoutParams.width, mutable = true))
-    params.put("height", LayoutParamsMapping.toInspectable(layoutParams.height, mutable = true))
+    params["width"] = LayoutParamsMapping.toInspectable(layoutParams.width, mutable = true)
+    params["height"] = LayoutParamsMapping.toInspectable(layoutParams.height, mutable = true)
 
     if (layoutParams is ViewGroup.MarginLayoutParams) {
-      val marginLayoutParams = layoutParams
-
       val margin =
           InspectableObject(
               mapOf<String, Inspectable>(
-                  "left" to InspectableValue.Number(marginLayoutParams.leftMargin, mutable = true),
-                  "top" to InspectableValue.Number(marginLayoutParams.topMargin, mutable = true),
-                  "right" to
-                      InspectableValue.Number(marginLayoutParams.rightMargin, mutable = true),
-                  "bottom" to
-                      InspectableValue.Number(marginLayoutParams.bottomMargin, mutable = true)))
+                  "left" to InspectableValue.Number(layoutParams.leftMargin, mutable = true),
+                  "top" to InspectableValue.Number(layoutParams.topMargin, mutable = true),
+                  "right" to InspectableValue.Number(layoutParams.rightMargin, mutable = true),
+                  "bottom" to InspectableValue.Number(layoutParams.bottomMargin, mutable = true)))
 
-      params.put("margin", margin)
+      params["margin"] = margin
     }
     if (layoutParams is FrameLayout.LayoutParams) {
-      params.put("gravity", GravityMapping.toInspectable(layoutParams.gravity, mutable = true))
+      params["gravity"] = GravityMapping.toInspectable(layoutParams.gravity, mutable = true)
     }
     if (layoutParams is LinearLayout.LayoutParams) {
-      val linearLayoutParams = layoutParams
-      params.put("weight", InspectableValue.Number(linearLayoutParams.weight, mutable = true))
-      params.put(
-          "gravity", GravityMapping.toInspectable(linearLayoutParams.gravity, mutable = true))
+      params["weight"] = InspectableValue.Number(layoutParams.weight, mutable = true)
+      params["gravity"] = GravityMapping.toInspectable(layoutParams.gravity, mutable = true)
     }
     return InspectableObject(params)
   }
 
-  fun getTags(node: View): MutableMap<String, Inspectable> {
+  private fun getViewTags(node: View): MutableMap<String, Inspectable> {
     val tags = mutableMapOf<String, Inspectable>()
 
     KeyedTagsField?.let { field ->
@@ -177,6 +170,7 @@ class ViewDescriptor : AbstractChainedDescriptor<View>() {
                   "MATCH_PARENT" to ViewGroup.LayoutParams.MATCH_PARENT,
                   "FILL_PARENT" to ViewGroup.LayoutParams.FILL_PARENT,
               )) {}
+
   private val VisibilityMapping: EnumMapping<Int> =
       object :
           EnumMapping<Int>(
@@ -187,41 +181,74 @@ class ViewDescriptor : AbstractChainedDescriptor<View>() {
               )) {}
 
   private val LayoutDirectionMapping: EnumMapping<Int> =
-      object :
-          EnumMapping<Int>(
-              mapOf(
-                  "LAYOUT_DIRECTION_INHERIT" to View.LAYOUT_DIRECTION_INHERIT,
-                  "LAYOUT_DIRECTION_LOCALE" to View.LAYOUT_DIRECTION_LOCALE,
-                  "LAYOUT_DIRECTION_LTR" to View.LAYOUT_DIRECTION_LTR,
-                  "LAYOUT_DIRECTION_RTL" to View.LAYOUT_DIRECTION_RTL,
-              )) {}
+      when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 -> {
+          object :
+              EnumMapping<Int>(
+                  mapOf(
+                      "LAYOUT_DIRECTION_INHERIT" to View.LAYOUT_DIRECTION_INHERIT,
+                      "LAYOUT_DIRECTION_LOCALE" to View.LAYOUT_DIRECTION_LOCALE,
+                      "LAYOUT_DIRECTION_LTR" to View.LAYOUT_DIRECTION_LTR,
+                      "LAYOUT_DIRECTION_RTL" to View.LAYOUT_DIRECTION_RTL,
+                  )) {}
+        }
+        else -> {
+          object : EnumMapping<Int>(emptyMap()) {}
+        }
+      }
 
   private val TextDirectionMapping: EnumMapping<Int> =
-      object :
-          EnumMapping<Int>(
-              mapOf(
-                  "TEXT_DIRECTION_INHERIT" to View.TEXT_DIRECTION_INHERIT,
-                  "TEXT_DIRECTION_FIRST_STRONG" to View.TEXT_DIRECTION_FIRST_STRONG,
-                  "TEXT_DIRECTION_ANY_RTL" to View.TEXT_DIRECTION_ANY_RTL,
-                  "TEXT_DIRECTION_LTR" to View.TEXT_DIRECTION_LTR,
-                  "TEXT_DIRECTION_RTL" to View.TEXT_DIRECTION_RTL,
-                  "TEXT_DIRECTION_LOCALE" to View.TEXT_DIRECTION_LOCALE,
-                  "TEXT_DIRECTION_FIRST_STRONG_LTR" to View.TEXT_DIRECTION_FIRST_STRONG_LTR,
-                  "TEXT_DIRECTION_FIRST_STRONG_RTL" to View.TEXT_DIRECTION_FIRST_STRONG_RTL,
-              )) {}
+      when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 -> {
+          object :
+              EnumMapping<Int>(
+                  mapOf(
+                      "TEXT_DIRECTION_INHERIT" to View.TEXT_DIRECTION_INHERIT,
+                      "TEXT_DIRECTION_FIRST_STRONG" to View.TEXT_DIRECTION_FIRST_STRONG,
+                      "TEXT_DIRECTION_ANY_RTL" to View.TEXT_DIRECTION_ANY_RTL,
+                      "TEXT_DIRECTION_LTR" to View.TEXT_DIRECTION_LTR,
+                      "TEXT_DIRECTION_RTL" to View.TEXT_DIRECTION_RTL,
+                      "TEXT_DIRECTION_LOCALE" to View.TEXT_DIRECTION_LOCALE,
+                  )) {}
+        }
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> {
+          object :
+              EnumMapping<Int>(
+                  mapOf(
+                      "TEXT_DIRECTION_INHERIT" to View.TEXT_DIRECTION_INHERIT,
+                      "TEXT_DIRECTION_FIRST_STRONG" to View.TEXT_DIRECTION_FIRST_STRONG,
+                      "TEXT_DIRECTION_ANY_RTL" to View.TEXT_DIRECTION_ANY_RTL,
+                      "TEXT_DIRECTION_LTR" to View.TEXT_DIRECTION_LTR,
+                      "TEXT_DIRECTION_RTL" to View.TEXT_DIRECTION_RTL,
+                      "TEXT_DIRECTION_LOCALE" to View.TEXT_DIRECTION_LOCALE,
+                      "TEXT_DIRECTION_FIRST_STRONG_LTR" to View.TEXT_DIRECTION_FIRST_STRONG_LTR,
+                      "TEXT_DIRECTION_FIRST_STRONG_RTL" to View.TEXT_DIRECTION_FIRST_STRONG_RTL,
+                  )) {}
+        }
+        else -> {
+          object : EnumMapping<Int>(emptyMap()) {}
+        }
+      }
 
   private val TextAlignmentMapping: EnumMapping<Int> =
-      object :
-          EnumMapping<Int>(
-              mapOf(
-                  "TEXT_ALIGNMENT_INHERIT" to View.TEXT_ALIGNMENT_INHERIT,
-                  "TEXT_ALIGNMENT_GRAVITY" to View.TEXT_ALIGNMENT_GRAVITY,
-                  "TEXT_ALIGNMENT_TEXT_START" to View.TEXT_ALIGNMENT_TEXT_START,
-                  "TEXT_ALIGNMENT_TEXT_END" to View.TEXT_ALIGNMENT_TEXT_END,
-                  "TEXT_ALIGNMENT_CENTER" to View.TEXT_ALIGNMENT_CENTER,
-                  "TEXT_ALIGNMENT_VIEW_START" to View.TEXT_ALIGNMENT_VIEW_START,
-                  "TEXT_ALIGNMENT_VIEW_END" to View.TEXT_ALIGNMENT_VIEW_END,
-              )) {}
+      when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 -> {
+          object :
+              EnumMapping<Int>(
+                  mapOf(
+                      "TEXT_ALIGNMENT_INHERIT" to View.TEXT_ALIGNMENT_INHERIT,
+                      "TEXT_ALIGNMENT_GRAVITY" to View.TEXT_ALIGNMENT_GRAVITY,
+                      "TEXT_ALIGNMENT_TEXT_START" to View.TEXT_ALIGNMENT_TEXT_START,
+                      "TEXT_ALIGNMENT_TEXT_END" to View.TEXT_ALIGNMENT_TEXT_END,
+                      "TEXT_ALIGNMENT_CENTER" to View.TEXT_ALIGNMENT_CENTER,
+                      "TEXT_ALIGNMENT_VIEW_START" to View.TEXT_ALIGNMENT_VIEW_START,
+                      "TEXT_ALIGNMENT_VIEW_END" to View.TEXT_ALIGNMENT_VIEW_END,
+                  )) {}
+        }
+        else -> {
+          object : EnumMapping<Int>(emptyMap()) {}
+        }
+      }
 
   private val GravityMapping =
       object :
@@ -239,21 +266,21 @@ class ViewDescriptor : AbstractChainedDescriptor<View>() {
                   "FILL_HORIZONTAL" to Gravity.FILL_HORIZONTAL,
               )) {}
 
-  companion object {
-    private var KeyedTagsField: Field? = null
-    private var ListenerInfoField: Field? = null
-    private var OnClickListenerField: Field? = null
+  private var KeyedTagsField: Field? = null
+  private var ListenerInfoField: Field? = null
+  private var OnClickListenerField: Field? = null
 
-    init {
-      try {
-        KeyedTagsField = View::class.java.getDeclaredField("mKeyedTags")
-        KeyedTagsField?.let { field -> field.isAccessible = true }
-        ListenerInfoField = View::class.java.getDeclaredField("mListenerInfo")
-        ListenerInfoField?.let { field -> field.isAccessible = true }
-        val viewInfoClassName = View::class.java.name + "\$ListenerInfo"
-        OnClickListenerField = Class.forName(viewInfoClassName).getDeclaredField("mOnClickListener")
-        OnClickListenerField?.let { field -> field.isAccessible = true }
-      } catch (ignored: Exception) {}
-    }
+  init {
+    try {
+      @SuppressLint("DiscouragedPrivateApi")
+      KeyedTagsField = View::class.java.getDeclaredField("mKeyedTags")
+      KeyedTagsField?.let { field -> field.isAccessible = true }
+      @SuppressLint("DiscouragedPrivateApi")
+      ListenerInfoField = View::class.java.getDeclaredField("mListenerInfo")
+      ListenerInfoField?.let { field -> field.isAccessible = true }
+      val viewInfoClassName = View::class.java.name + "\$ListenerInfo"
+      OnClickListenerField = Class.forName(viewInfoClassName).getDeclaredField("mOnClickListener")
+      OnClickListenerField?.let { field -> field.isAccessible = true }
+    } catch (ignored: Exception) {}
   }
 }

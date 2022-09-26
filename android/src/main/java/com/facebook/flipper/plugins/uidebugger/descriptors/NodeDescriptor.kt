@@ -8,16 +8,30 @@
 package com.facebook.flipper.plugins.uidebugger.descriptors
 
 import com.facebook.flipper.plugins.uidebugger.common.InspectableObject
+import com.facebook.flipper.plugins.uidebugger.model.Bounds
+
+/*
+ Descriptors are an extension point used during traversal to extract data out of arbitrary
+ objects in the hierarchy. Descriptors can represent native view or declarative components or
+ any type of object such as an activity
+
+ Descriptors should be stateless and each descriptor should be a singleton
+*/
+
+typealias SectionName = String
+
+object BaseTags {
+  const val Declarative = "Declarative"
+  const val Native = "Native"
+  const val Accessibility = "Accessibility"
+  const val Android = "Android"
+  const val Unknown = "Unknown"
+}
 
 interface NodeDescriptor<T> {
-  /** Initialize a descriptor. */
-  fun init()
 
-  /**
-   * A globally unique ID used to identify a node in a hierarchy. If your node does not have a
-   * globally unique ID it is fine to rely on [System.identityHashCode].
-   */
-  fun getId(node: T): String
+  /** Should be w.r.t the direct parent */
+  fun getBounds(node: T): Bounds?
 
   /**
    * The name used to identify this node in the inspector. Does not need to be unique. A good
@@ -26,11 +40,29 @@ interface NodeDescriptor<T> {
   fun getName(node: T): String
 
   /** The children this node exposes in the inspector. */
-  fun getChildren(node: T, children: MutableList<Any>)
+  fun getChildren(node: T): List<Any>
+
+  /**
+   * If you have overlapping children this indicates which child is active / on top, we will only
+   * listen to / traverse this child. If return null we assume all children are 'active'
+   */
+  fun getActiveChild(node: T): Any?
 
   /**
    * Get the data to show for this node in the sidebar of the inspector. The object will be shown in
    * order and with a header matching the given name.
    */
-  fun getData(node: T, builder: MutableMap<String, InspectableObject>)
+  fun getData(node: T): Map<SectionName, InspectableObject>
+
+  /**
+   * Set of tags to describe this node in an abstract way for the UI Unfortunately this can't be an
+   * enum as we have to plugin 3rd party frameworks dynamically
+   */
+  fun getTags(node: T): Set<String>
+}
+
+typealias Id = Int
+
+fun Any.nodeId(): Id {
+  return System.identityHashCode(this)
 }

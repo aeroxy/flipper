@@ -9,43 +9,23 @@ package com.facebook.flipper.plugins.uidebugger.descriptors
 
 import android.app.Activity
 import com.facebook.flipper.plugins.uidebugger.common.InspectableObject
-import com.facebook.flipper.plugins.uidebugger.stetho.FragmentCompat
+import com.facebook.flipper.plugins.uidebugger.core.FragmentTracker
 
-class ActivityDescriptor : AbstractChainedDescriptor<Activity>() {
-  override fun onInit() {}
+object ActivityDescriptor : ChainedDescriptor<Activity>() {
 
-  override fun onGetId(activity: Activity): String {
-    return Integer.toString(System.identityHashCode(activity))
+  override fun onGetName(node: Activity): String {
+    return node.javaClass.simpleName
   }
 
-  override fun onGetName(activity: Activity): String {
-    return activity.javaClass.simpleName
-  }
+  override fun onGetChildren(node: Activity, children: MutableList<Any>) {
+    node.window?.let { window -> children.add(window) }
 
-  override fun onGetChildren(activity: Activity, children: MutableList<Any>) {
-    activity.window?.let { window -> children.add(activity.window) }
-
-    var fragments = getFragments(FragmentCompat.supportInstance, activity)
-    for (fragment in fragments) {
-      children.add(fragment)
-    }
-
-    fragments = getFragments(FragmentCompat.frameworkInstance, activity)
-    for (fragment in fragments) {
-      children.add(fragment)
-    }
+    val fragments = FragmentTracker.getDialogFragments(node)
+    fragments.forEach { fragment -> children.add(fragment) }
   }
 
   override fun onGetData(
-      activity: Activity,
+      node: Activity,
       attributeSections: MutableMap<String, InspectableObject>
   ) {}
-
-  private fun getFragments(compat: FragmentCompat<*, *, *, *>?, activity: Activity): List<Any> {
-    if (compat == null) {
-      return emptyList()
-    }
-
-    return compat?.getFragments(activity)
-  }
 }

@@ -7,7 +7,7 @@
  * @format
  */
 
-import {FlipperLib, Notification} from 'flipper-plugin';
+import {FlipperLib, Notification} from 'flipper-plugin-core';
 import {FlipperServer, FlipperServerConfig} from 'flipper-common';
 
 type NotificationEvents = 'show' | 'click' | 'close' | 'reply' | 'action';
@@ -126,6 +126,7 @@ export interface RenderHost {
   showSelectDirectoryDialog?(defaultPath?: string): Promise<string | undefined>;
   importFile: FlipperLib['importFile'];
   exportFile: FlipperLib['exportFile'];
+  exportFileBinary: FlipperLib['exportFileBinary'];
   hasFocus(): boolean;
   onIpcEvent<Event extends keyof MainProcessEvents>(
     event: Event,
@@ -138,7 +139,6 @@ export interface RenderHost {
   shouldUseDarkColors(): boolean;
   restartFlipper(update?: boolean): void;
   openLink(url: string): void;
-  loadDefaultPlugins(): Record<string, any>;
   GK(gatekeeper: string): boolean;
   flipperServer: FlipperServer;
   serverConfig: FlipperServerConfig;

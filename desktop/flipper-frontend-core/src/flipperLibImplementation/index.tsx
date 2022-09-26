@@ -7,7 +7,7 @@
  * @format
  */
 
-import {RemoteServerContext, FlipperLib} from 'flipper-plugin';
+import {RemoteServerContext, FlipperLib} from 'flipper-plugin-core';
 import {
   BufferEncoding,
   ExecOptions,
@@ -36,6 +36,7 @@ export function baseFlipperLibImplementation(
     openLink: renderHost.openLink,
     importFile: renderHost.importFile,
     exportFile: renderHost.exportFile,
+    exportFileBinary: renderHost.exportFileBinary,
     paths: {
       appPath: renderHost.serverConfig.paths.appPath,
       homePath: renderHost.serverConfig.paths.homePath,

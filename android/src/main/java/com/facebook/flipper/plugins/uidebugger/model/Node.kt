@@ -8,11 +8,18 @@
 package com.facebook.flipper.plugins.uidebugger.model
 
 import com.facebook.flipper.plugins.uidebugger.common.InspectableObject
+import com.facebook.flipper.plugins.uidebugger.descriptors.Id
 
 @kotlinx.serialization.Serializable
 data class Node(
-    val id: String,
+    val id: Id,
     val name: String,
     val attributes: Map<String, InspectableObject>,
-    val children: List<String>
+    val bounds: Bounds?,
+    val tags: Set<String>,
+    val children: List<Id>,
+    val activeChild: Id?,
 )
+
+@kotlinx.serialization.Serializable
+data class Bounds(val x: Int, val y: Int, val width: Int, val height: Int)

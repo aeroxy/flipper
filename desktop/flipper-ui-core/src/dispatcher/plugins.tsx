@@ -8,9 +8,14 @@
  */
 
 import type {Store} from '../reducers/index';
-import {Logger, MarketplacePluginDetails} from 'flipper-common';
+import {
+  InstalledPluginDetails,
+  Logger,
+  MarketplacePluginDetails,
+} from 'flipper-common';
 import {PluginDefinition} from '../plugin';
 import React from 'react';
+import * as ReactJsxRuntime from 'react/jsx-runtime';
 import ReactDOM from 'react-dom';
 import ReactDOMClient from 'react-dom/client';
 import ReactIs from 'react-is';
@@ -20,7 +25,6 @@ import {
   addDisabledPlugins,
   addFailedPlugins,
   registerLoadedPlugins,
-  registerBundledPlugins,
   registerMarketplacePlugins,
   pluginsInitialized,
 } from '../reducers/plugins';
@@ -69,7 +73,6 @@ class UIPluginInitializer extends AbstractPluginInitializer {
       );
     }
 
-    this.store.dispatch(registerBundledPlugins(this.bundledPlugins));
     this.store.dispatch(registerLoadedPlugins(this.loadedPlugins));
     this.store.dispatch(addGatekeepedPlugins(this.gatekeepedPlugins));
     this.store.dispatch(addDisabledPlugins(this.disabledPlugins));
@@ -83,7 +86,7 @@ class UIPluginInitializer extends AbstractPluginInitializer {
   }
 
   public requirePluginImpl(pluginDetails: ActivatablePluginDetails) {
-    return requirePluginInternal(this.defaultPluginsIndex, pluginDetails);
+    return requirePluginInternal(pluginDetails);
   }
 
   protected loadMarketplacePlugins() {
@@ -111,6 +114,7 @@ export default async (store: Store, _logger: Logger) => {
     antd,
     emotion_styled,
     antdesign_icons,
+    ReactJsxRuntime,
   });
 
   uiPluginInitializer = new UIPluginInitializer(store);
@@ -123,12 +127,11 @@ export const requirePlugin = (pluginDetails: ActivatablePluginDetails) =>
   )(pluginDetails);
 
 export const requirePluginInternal = async (
-  defaultPluginsIndex: any,
   pluginDetails: ActivatablePluginDetails,
 ): Promise<PluginDefinition> => {
-  let plugin = pluginDetails.isBundled
-    ? defaultPluginsIndex[pluginDetails.name]
-    : await getRenderHostInstance().requirePlugin(pluginDetails.entry);
+  let plugin = await getRenderHostInstance().requirePlugin(
+    (pluginDetails as InstalledPluginDetails).entry,
+  );
   if (!plugin) {
     throw new Error(
       `Failed to obtain plugin source for: ${pluginDetails.name}`,

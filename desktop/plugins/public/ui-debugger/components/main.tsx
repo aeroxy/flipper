@@ -8,91 +8,35 @@
  */
 
 import React, {useState} from 'react';
-import {PerfStatsEvent, plugin} from '../index';
+import {plugin} from '../index';
 import {
   DataInspector,
-  DataTable,
-  DataTableColumn,
   DetailSidebar,
   Layout,
   usePlugin,
   useValue,
 } from 'flipper-plugin';
-import {Tree, Typography} from 'antd';
-import type {DataNode} from 'antd/es/tree';
-import {DownOutlined} from '@ant-design/icons';
+import {Typography} from 'antd';
+
 import {useHotkeys} from 'react-hotkeys-hook';
 import {Id, UINode} from '../types';
-
-function nodesToAntTree(root: Id, nodes: Map<Id, UINode>): DataNode {
-  function uiNodeToAntNode(id: Id): DataNode {
-    const node = nodes.get(id);
-    return {
-      key: id,
-      title: node?.name,
-      children: node?.children.map((id) => uiNodeToAntNode(id)),
-    };
-  }
-
-  return uiNodeToAntNode(root);
-}
-
-function formatDiff(start: number, end: number): string {
-  const ms = end - start;
-  return `${ms.toFixed(0)}ms`;
-}
-
-export const columns: DataTableColumn<PerfStatsEvent>[] = [
-  {
-    key: 'txId',
-    title: 'TXID',
-  },
-  {
-    key: 'nodesCount',
-    title: 'Total nodes',
-  },
-  {
-    key: 'start',
-    title: 'Start',
-    onRender: (row: PerfStatsEvent) => {
-      console.log(row.start);
-      return new Date(row.start).toISOString();
-    },
-  },
-  {
-    key: 'scanComplete',
-    title: 'Scan time',
-    onRender: (row: PerfStatsEvent) => {
-      return formatDiff(row.start, row.scanComplete);
-    },
-  },
-  {
-    key: 'serializationComplete',
-    title: 'Serialization time',
-    onRender: (row: PerfStatsEvent) => {
-      return formatDiff(row.scanComplete, row.serializationComplete);
-    },
-  },
-  {
-    key: 'socketComplete',
-    title: 'Socket send time',
-    onRender: (row: PerfStatsEvent) => {
-      return formatDiff(row.serializationComplete, row.socketComplete);
-    },
-  },
-];
+import {PerfStats} from './PerfStats';
+import {Tree} from './Tree';
+import {Visualization2D} from './Visualization2D';
+import {useKeyboardModifiers} from '../hooks/useKeyboardModifiers';
 
 export function Component() {
   const instance = usePlugin(plugin);
   const rootId = useValue(instance.rootId);
-  const nodes = useValue(instance.nodes);
+  const nodes: Map<Id, UINode> = useValue(instance.nodes);
 
   const [showPerfStats, setShowPerfStats] = useState(false);
-  const [selectedNode, setSelectedNode] = useState<string | undefined>(
-    undefined,
-  );
+  const [selectedNode, setSelectedNode] = useState<Id | undefined>(undefined);
+  const [hoveredNode, setHoveredNode] = useState<Id | undefined>(undefined);
 
   useHotkeys('ctrl+i', () => setShowPerfStats((show) => !show));
+
+  const {ctrlPressed} = useKeyboardModifiers();
 
   function renderAttributesInspector(node: UINode | undefined) {
     if (!node) {
@@ -103,37 +47,37 @@ export function Component() {
         <DetailSidebar>
           <Layout.Container gap pad>
             <Typography.Title level={2}>Attributes Inspector</Typography.Title>
-            <DataInspector data={node.attributes} expandRoot />
+            <DataInspector data={node} expandRoot />
           </Layout.Container>
         </DetailSidebar>
       </>
     );
   }
 
-  if (showPerfStats)
-    return (
-      <DataTable<PerfStatsEvent>
-        dataSource={instance.perfEvents}
-        columns={columns}
-      />
-    );
+  if (showPerfStats) return <PerfStats events={instance.perfEvents} />;
 
   if (rootId) {
-    const antTree = nodesToAntTree(rootId, nodes);
     return (
       <>
         <Layout.ScrollContainer>
-          <Tree
-            showIcon
-            showLine
-            onSelect={(selected) => {
-              setSelectedNode(selected[0] as string);
-            }}
-            defaultExpandAll
-            expandedKeys={[...nodes.keys()]}
-            switcherIcon={<DownOutlined />}
-            treeData={[antTree]}
-          />
+          <Layout.Horizontal>
+            <Tree
+              selectedNode={selectedNode}
+              onSelectNode={setSelectedNode}
+              onHoveredNode={setHoveredNode}
+              nodes={nodes}
+              rootId={rootId}
+            />
+            <Visualization2D
+              root={rootId}
+              nodes={nodes}
+              hoveredNode={hoveredNode}
+              onHoverNode={setHoveredNode}
+              selectedNode={selectedNode}
+              onSelectNode={setSelectedNode}
+              modifierPressed={ctrlPressed}
+            />
+          </Layout.Horizontal>
         </Layout.ScrollContainer>
         {selectedNode && renderAttributesInspector(nodes.get(selectedNode))}
       </>
