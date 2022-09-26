@@ -156,7 +156,7 @@
     "rm-modules": "rimraf **/*/node_modules node_modules",
     "rm-temp": "rimraf $TMPDIR/jest* $TMPDIR/react-native-packager*",
     "rm-watches": "watchman watch-del-all",
-    "start": "yarn dev-server --inspect=9229 --fast-refresh",
+    "start": "ELECTRON_OVERRIDE_DIST_PATH=./node_modules/electron/dist yarn dev-server --inspect=9229 --fast-refresh",
     "start:break": "yarn dev-server --inspect-brk=9229",
     "start:no-bundled-plugins": "yarn start --no-bundled-plugins",
     "test": "cross-env TZ=Pacific/Pohnpei jest",
